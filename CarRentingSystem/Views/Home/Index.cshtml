@@ -11,7 +11,7 @@
     var thirdCar = cars.Count > 2 ? cars[2] : null;
 }
 
-@if (!cars.Any())
+@if (!Model.Cars.Any())
 {
     <div class="jumbotron">
         <h1 class="display-4">Hello, world!</h1>
