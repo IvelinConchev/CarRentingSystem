@@ -10,8 +10,8 @@
     {
         private readonly CarRentingDbContext data;
 
-        public HomeController(CarRentingDbContext _data)
-      => data = _data;
+        public HomeController(CarRentingDbContext data)
+            => this.data = data;
 
         public IActionResult Index()
         {
@@ -25,8 +25,8 @@
                     Id = c.Id,
                     Brand = c.Brand,
                     Model = c.Model,
-                    ImageUrl = c.ImageUrl,
                     Year = c.Year,
+                    ImageUrl = c.ImageUrl
                 })
                 .Take(3)
                 .ToList();

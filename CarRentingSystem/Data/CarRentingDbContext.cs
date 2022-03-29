@@ -15,6 +15,8 @@
 
         public DbSet<Category> Categories { get; init; }
 
+        public DbSet<Dealer> Dealers { get; init; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             builder.Entity<Car>()

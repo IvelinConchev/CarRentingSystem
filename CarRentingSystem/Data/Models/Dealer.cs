@@ -4,7 +4,7 @@
     using static Data.DataConstants.Dealer;
     public class Dealer
     {
-        public int Id { get; set; }
+        public int Id { get; init; }
 
         [Required]
         [MaxLength(NameMaxLength)]
@@ -16,6 +16,7 @@
 
         [Required]
         public string UserId { get; set; }
-        public IEnumerable<Car> Cars { get; set; } = new List<Car>();
+
+        public IEnumerable<Car> Cars { get; init; } = new List<Car>();
     }
 }
