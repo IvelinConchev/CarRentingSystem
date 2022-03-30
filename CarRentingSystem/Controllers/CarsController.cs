@@ -1,10 +1,5 @@
 ﻿namespace CarRentingSystem.Controllers
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using CarRentingSystem.Data;
-    using CarRentingSystem.Data.Models;
     using CarRentingSystem.Infrastructure;
     using CarRentingSystem.Models.Cars;
     using CarRentingSystem.Services.Cars;
@@ -157,14 +152,14 @@
         {
             var userId = this.User.Id();
 
-            if (!this.dealers.IsDealer(userId))
+            if (!this.dealers.IsDealer(userId) && !User.IsAdmin())
             {
                 return RedirectToAction(nameof(DealersController.Become), "Dealers");
             }
 
             var car = this.cars.Details(id);
 
-            if (car.UserId != userId)
+            if (car.UserId != userId && !User.IsAdmin())
             {
                 return Unauthorized();
             }
@@ -181,13 +176,13 @@
             });
         }
 
-        [Authorize]
         [HttpPost]
+        [Authorize]
         public IActionResult Edit(int id, CarFormModel car)
         {
             var dealerId = this.dealers.IdByUser(this.User.Id());
 
-            if (dealerId == 0)
+            if (dealerId == 0 && !User.IsAdmin())
             {
                 return RedirectToAction(nameof(DealersController.Become), "Dealers");
             }
@@ -204,7 +199,7 @@
                 return View(car);
             }
 
-            if (!this.cars.IsByDealer(id, dealerId))
+            if (!this.cars.IsByDealer(id, dealerId) && !User.IsAdmin())
             {
                 return BadRequest();
             }
