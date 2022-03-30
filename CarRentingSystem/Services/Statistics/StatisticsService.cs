@@ -2,7 +2,7 @@
 {
     using CarRentingSystem.Data;
 
-    public class StatisticsService
+    public class StatisticsService : IStatisticsService
     {
         private readonly CarRentingDbContext data;
 

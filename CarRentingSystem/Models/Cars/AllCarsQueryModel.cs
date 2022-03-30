@@ -1,5 +1,6 @@
 ﻿namespace CarRentingSystem.Models.Cars
 {
+    using CarRentingSystem.Services.Cars;
     using System.ComponentModel.DataAnnotations;
 
     public class AllCarsQueryModel
@@ -19,6 +20,6 @@
 
         public IEnumerable<string> Brands { get; set; }
 
-        public IEnumerable<CarListingViewModel> Cars { get; set; }
+        public IEnumerable<CarServiceModel> Cars { get; set; }
     }
 }

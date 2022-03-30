@@ -7,111 +7,169 @@
     using CarRentingSystem.Data.Models;
     using CarRentingSystem.Infrastructure;
     using CarRentingSystem.Models.Cars;
+    using CarRentingSystem.Services.Cars;
+    using CarRentingSystem.Services.Dealers;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
 
     public class CarsController : Controller
     {
-        private readonly CarRentingDbContext data;
+        private readonly ICarService cars;
+        private readonly IDealerService dealers;
+        //private readonly CarRentingDbContext data;
 
-        public CarsController(CarRentingDbContext data)
-            => this.data = data;
+        public CarsController(
+            ICarService _cars,
+            IDealerService _dealers)
+        {
+            //this.data = data;
+            this.cars = _cars;
+            this.dealers = _dealers;
+        }
+
 
         public IActionResult All([FromQuery] AllCarsQueryModel query)
         {
-            var carsQuery = this.data.Cars.AsQueryable();
+            var queryResult = this.cars.All(
+                query.Brand,
+                query.SearchTerm,
+                query.Sorting,
+                query.CurrentPage,
+                AllCarsQueryModel.CarsPerPage);
 
-            if (!string.IsNullOrWhiteSpace(query.Brand))
-            {
-                carsQuery = carsQuery.Where(c => c.Brand == query.Brand);
-            }
+            var carBrands = this.cars.AllBrands();
 
-            if (!string.IsNullOrWhiteSpace(query.SearchTerm))
-            {
-                carsQuery = carsQuery.Where(c =>
-                    (c.Brand + " " + c.Model).ToLower().Contains(query.SearchTerm.ToLower()) ||
-                    c.Description.ToLower().Contains(query.SearchTerm.ToLower()));
-            }
-
-            carsQuery = query.Sorting switch
-            {
-                CarSorting.Year => carsQuery.OrderByDescending(c => c.Year),
-                CarSorting.BrandAndModel => carsQuery.OrderBy(c => c.Brand).ThenBy(c => c.Model),
-                CarSorting.DateCreated or _ => carsQuery.OrderByDescending(c => c.Id)
-            };
-
-            var totalCars = carsQuery.Count();
-
-            var cars = carsQuery
-                .Skip((query.CurrentPage - 1) * AllCarsQueryModel.CarsPerPage)
-                .Take(AllCarsQueryModel.CarsPerPage)
-                .Select(c => new CarListingViewModel
-                {
-                    Id = c.Id,
-                    Brand = c.Brand,
-                    Model = c.Model,
-                    Year = c.Year,
-                    ImageUrl = c.ImageUrl,
-                    Category = c.Category.Name
-                })
-                .ToList();
-
-            var carBrands = this.data
-                .Cars
-                .Select(c => c.Brand)
-                .Distinct()
-                .OrderBy(br => br)
-                .ToList();
-
-            query.TotalCars = totalCars;
             query.Brands = carBrands;
-            query.Cars = cars;
+            query.TotalCars = queryResult.TotalCars;
+            query.Cars = queryResult.Cars;
 
             return View(query);
+            //var carsQuery = this.data.Cars.AsQueryable();
+
+            //if (!string.IsNullOrWhiteSpace(query.Brand))
+            //{
+            //    carsQuery = carsQuery.Where(c => c.Brand == query.Brand);
+            //}
+
+            //if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+            //{
+            //    carsQuery = carsQuery.Where(c =>
+            //        (c.Brand + " " + c.Model).ToLower().Contains(query.SearchTerm.ToLower()) ||
+            //        c.Description.ToLower().Contains(query.SearchTerm.ToLower()));
+            //}
+
+            //carsQuery = query.Sorting switch
+            //{
+            //    CarSorting.Year => carsQuery.OrderByDescending(c => c.Year),
+            //    CarSorting.BrandAndModel => carsQuery.OrderBy(c => c.Brand).ThenBy(c => c.Model),
+            //    CarSorting.DateCreated or _ => carsQuery.OrderByDescending(c => c.Id)
+            //};
+
+            //var totalCars = carsQuery.Count();
+
+            //var cars = carsQuery
+            //    .Skip((query.CurrentPage - 1) * AllCarsQueryModel.CarsPerPage)
+            //    .Take(AllCarsQueryModel.CarsPerPage)
+            //    .Select(c => new CarListingViewModel
+            //    {
+            //        Id = c.Id,
+            //        Brand = c.Brand,
+            //        Model = c.Model,
+            //        Year = c.Year,
+            //        ImageUrl = c.ImageUrl,
+            //        Category = c.Category.Name
+            //    })
+            //    .ToList();
+
+            //var carBrands = this.data
+            //    .Cars
+            //    .Select(c => c.Brand)
+            //    .Distinct()
+            //    .OrderBy(br => br)
+            //    .ToList();
+
+            //query.TotalCars = totalCars;
+            //query.Brands = carBrands;
+            //query.Cars = cars;
+
+            //return View(query);
+        }
+
+        [Authorize]
+        public IActionResult Mine()
+        {
+            var myCars = this.cars.ByUser(this.User.Id());
+
+            return View(myCars);
         }
 
         [Authorize]
         public IActionResult Add()
         {
-            if (!this.UserIsDealer())
+            if (!this.dealers.IsDealer(this.User.Id()))
             {
                 return RedirectToAction(nameof(DealersController.Become), "Dealers");
             }
 
-            return View(new AddCarFormModel
+            return View(new CarFormModel
             {
-                Categories = this.GetCarCategories()
+                Categories = this.cars.AllCategories()
             });
         }
 
         [HttpPost]
         [Authorize]
-        public IActionResult Add(AddCarFormModel car)
+        public IActionResult Add(CarFormModel car)
         {
-            var dealerId = this.data
-                .Dealers
-                .Where(d => d.UserId == this.User.GetId())
-                .Select(d => d.Id)
-                .FirstOrDefault();
+            var dealerId = this.dealers.IdByUser(this.User.Id());
 
             if (dealerId == 0)
             {
                 return RedirectToAction(nameof(DealersController.Become), "Dealers");
             }
 
-            if (!this.data.Categories.Any(c => c.Id == car.CategoryId))
+            if (!this.cars.CategoryExists(car.CategoryId))
             {
                 this.ModelState.AddModelError(nameof(car.CategoryId), "Category does not exist.");
             }
 
-            if (!ModelState.IsValid)
+            if (ModelState.IsValid)
             {
-                car.Categories = this.GetCarCategories();
+                car.Categories = this.cars.AllCategories();
 
                 return View(car);
             }
 
-            var carData = new Car
+            this.cars.Create(
+                  car.Brand,
+                  car.Model,
+                  car.Description,
+                  car.ImageUrl,
+                  car.Year,
+                  car.CategoryId,
+                  dealerId);
+
+            return RedirectToAction(nameof(All));
+        }
+
+        [Authorize]
+        public IActionResult Edit(int id)
+        {
+            var userId = this.User.Id();
+
+            if (!this.dealers.IsDealer(userId))
+            {
+                return RedirectToAction(nameof(DealersController.Become), "Dealers");
+            }
+
+            var car = this.cars.Details(id);
+
+            if (car.UserId != userId)
+            {
+                return Unauthorized();
+            }
+
+            return View(new CarFormModel
             {
                 Brand = car.Brand,
                 Model = car.Model,
@@ -119,28 +177,62 @@
                 ImageUrl = car.ImageUrl,
                 Year = car.Year,
                 CategoryId = car.CategoryId,
-                DealerId = dealerId
-            };
+                Categories = this.cars.AllCategories()
+            });
+        }
 
-            this.data.Cars.Add(carData);
-            this.data.SaveChanges();
+        [Authorize]
+        [HttpPost]
+        public IActionResult Edit(int id, CarFormModel car)
+        {
+            var dealerId = this.dealers.IdByUser(this.User.Id());
+
+            if (dealerId == 0)
+            {
+                return RedirectToAction(nameof(DealersController.Become), "Dealers");
+            }
+
+            if (!this.cars.CategoryExists(car.CategoryId))
+            {
+                this.ModelState.AddModelError(nameof(car.CategoryId), "Category does not exist.");
+            }
+
+            if (ModelState.IsValid)
+            {
+                car.Categories = this.cars.AllCategories();
+
+                return View(car);
+            }
+
+            if (!this.cars.IsByDealer(id, dealerId))
+            {
+                return BadRequest();
+            }
+
+             this.cars.Edit(
+                  id,
+                  car.Brand,
+                  car.Model,
+                  car.Description,
+                  car.ImageUrl,
+                  car.Year,
+                  car.CategoryId);
 
             return RedirectToAction(nameof(All));
         }
+        //private bool UserIsDealer()
+        //    => this.data
+        //        .Dealers
+        //        .Any(d => d.UserId == this.User.GetId());
 
-        private bool UserIsDealer()
-            => this.data
-                .Dealers
-                .Any(d => d.UserId == this.User.GetId());
-
-        private IEnumerable<CarCategoryViewModel> GetCarCategories()
-            => this.data
-                .Categories
-                .Select(c => new CarCategoryViewModel
-                {
-                    Id = c.Id,
-                    Name = c.Name
-                })
-                .ToList();
+        //private IEnumerable<CarCategoryServiceModel> GetCarCategories()
+        //    => this.data
+        //        .Categories
+        //        .Select(c => new CarCategoryServiceModel
+        //        {
+        //            Id = c.Id,
+        //            Name = c.Name
+        //        })
+        //        .ToList();
     }
 }
