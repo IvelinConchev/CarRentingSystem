@@ -1,4 +1,5 @@
 using CarRentingSystem.Data;
+using CarRentingSystem.Data.Models;
 using CarRentingSystem.Infrastructure;
 using CarRentingSystem.Services.Cars;
 using CarRentingSystem.Services.Dealers;
@@ -19,13 +20,14 @@ builder.Services.AddTransient<ICarService, CarService>();
 builder.Services.AddTransient<IDealerService, DealerService>();
 builder.Services.AddTransient<IStatisticsService, StatisticsService>();
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options =>
+builder.Services.AddDefaultIdentity<User>(options =>
 {
     options.Password.RequireDigit = false;
     options.Password.RequireLowercase = false;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
 })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<CarRentingDbContext>();
 builder.Services.AddControllersWithViews();
 
@@ -56,5 +58,5 @@ app.MapDefaultControllerRoute();
 app.MapRazorPages();
 
 app.PrepareDatabase();
-
+app.UseAuthentication();
 app.Run();
